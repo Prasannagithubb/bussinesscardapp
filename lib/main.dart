@@ -83,11 +83,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ignoredFields = [];
       ignoredFieldsAssignments = {};
       _clearAllControllers();
-
       for (TextBlock block in recognizedText.blocks) {
         for (TextLine line in block.lines) {
           recognizedWords.add(line.text);
-          print("${recognizedWords}");
+          print("${recognizedWords.reversed}");
         }
       }
 
@@ -110,11 +109,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _populateTextFields() {
-    final phonePattern = RegExp(r'^(\+91[\-\s]?)?[7-9][0-9]{9}$');
-    final pincodePattern = RegExp(r'^\d{6}$');
+    final phonePattern = RegExp(r'(\+91[\-\s]?)?[7-9][0-9]{9}');
+    final pincodePattern = RegExp(r'[1-9][0-9]{5}');
     final emailPattern =
-        RegExp(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$');
+        RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
+    final addressPattern =
+        RegExp(r'[\d\w\s,.]+'); // Generic pattern for address
 
+    // Initialize fields
     String name = "";
     String designation = "";
     String companyName = "";
@@ -127,30 +129,45 @@ class _HomeScreenState extends State<HomeScreen> {
     String city = "";
     String pincode = "";
 
+    // Extract and categorize the recognized text
     for (var line in recognizedWords) {
-      if (emailPattern.hasMatch(line) && email.isEmpty) {
-        email = line;
-      } else if (phonePattern.hasMatch(line) && mobileNumber.isEmpty) {
+      // Check for phone numbers
+      if (phonePattern.hasMatch(line) && mobileNumber.isEmpty) {
         mobileNumber = line;
       } else if (phonePattern.hasMatch(line) &&
           mobileNumber.isNotEmpty &&
           altMobileNumber.isEmpty) {
         altMobileNumber = line;
-      } else if (pincodePattern.hasMatch(line) && pincode.isEmpty) {
+      }
+
+      // Check for email
+      if (emailPattern.hasMatch(line) && email.isEmpty) {
+        email = line;
+      }
+
+      // Check for pincode
+      if (pincodePattern.hasMatch(line) && pincode.isEmpty) {
         pincode = line;
-      } else if (name.isEmpty) {
+      }
+
+      // Check for designation and company name
+      if (line.contains('Manager Business Development') &&
+          designation.isEmpty) {
+        designation = '';
+      } else if (line.contains('Buson Digital Services India Pvt. Ltd.') &&
+          companyName.isEmpty) {
+        companyName = '';
+      } else if (name.isEmpty &&
+          !line.contains('Manager Business Development') &&
+          !line.contains('Buson Digital Services India Pvt. Ltd.')) {
         name = line;
-      } else if (designation.isEmpty) {
-        designation = line; // Added assignment for Designation
-      } else if (companyName.isEmpty) {
-        companyName = line;
-      } else if (address1.isEmpty) {
+      } else if (addressPattern.hasMatch(line) && address1.isEmpty) {
         address1 = line;
-      } else if (address2.isEmpty) {
+      } else if (addressPattern.hasMatch(line) && address2.isEmpty) {
         address2 = line;
-      } else if (area.isEmpty) {
+      } else if (addressPattern.hasMatch(line) && area.isEmpty) {
         area = line;
-      } else if (city.isEmpty) {
+      } else if (addressPattern.hasMatch(line) && city.isEmpty) {
         city = line;
       } else {
         ignoredFields.add(line);
@@ -158,6 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    // Populate the fields with recognized values
     nameController.text = name;
     designationnameController.text = designation;
     companyController.text = companyName;
@@ -235,27 +253,41 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               // Editable Text Field
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: TextFormField(
                   cursorColor: Colors.blue,
                   controller: controller,
                   decoration: InputDecoration(
                     hintText: 'Enter or select $label',
-                    border: const OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
+                    border: const UnderlineInputBorder(
                       borderSide: BorderSide(
                         color:
                             Colors.blue, // Set the color for the focused border
                         width: 2.0,
                       ),
                     ),
-                    enabledBorder: OutlineInputBorder(
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                        color:
+                            Colors.blue, // Set the color for the focused border
+                        width: 2.0,
+                      ),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
                       borderSide: BorderSide(
                         color: Colors.grey, // Default border color
                         width: 1.0,
                       ),
                     ),
                   ),
+                  onChanged: (text) {
+                    // Update the text field state when the user types
+                    setState(() {
+                      if (options.contains(text)) {
+                        controller.text = text;
+                      }
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -265,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: DropdownButton<String>(
                   value: options.contains(controller.text)
                       ? controller.text
-                      : null, // Pre-select if text matches an option
+                      : null,
                   isExpanded: true,
                   onChanged: (String? newValue) {
                     if (newValue != null) {
