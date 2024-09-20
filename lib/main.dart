@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -33,16 +34,20 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late TextRecognizer textRecognizer;
   late ImagePicker imagePicker;
-
   String? pickedImagePath;
   List<String> recognizedWords = [];
   List<String> ignoredFields = [];
+  List<String> scannedFields = [];
+
   Map<String, String> ignoredFieldsAssignments = {};
+  Map<String, String> scannedvalues = {};
   bool isRecognizing = false;
+  String? ignoredFieldValue;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController designationnameController =
       TextEditingController();
+  final TextEditingController designationController = TextEditingController();
   final TextEditingController companyController = TextEditingController();
   final TextEditingController mobileController = TextEditingController();
   final TextEditingController altMobileController = TextEditingController();
@@ -53,6 +58,36 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController cityController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
   final TextEditingController pincodeController = TextEditingController();
+
+  final Map<String, TextEditingController> fieldControllers = {
+    'Name': TextEditingController(),
+    'Designation': TextEditingController(),
+    'Company Name': TextEditingController(),
+    'Mobile': TextEditingController(),
+    'Alternate Mobile': TextEditingController(),
+    'Email ID': TextEditingController(),
+    'Address 1': TextEditingController(),
+    'Address 2': TextEditingController(),
+    'Area': TextEditingController(),
+    'City': TextEditingController(),
+    'State': TextEditingController(),
+    'Pincode': TextEditingController(),
+  };
+
+  final List<String> availableFields = [
+    'Name',
+    'Designation',
+    'Company Name',
+    'Mobile',
+    'Alternate Mobile',
+    'Email ID',
+    'Address 1',
+    'Address 2',
+    'Area',
+    'City',
+    'State',
+    'Pincode',
+  ];
 
   @override
   void initState() {
@@ -77,16 +112,15 @@ class _HomeScreenState extends State<HomeScreen> {
       final inputImage = InputImage.fromFilePath(pickedImage.path);
       final RecognizedText recognizedText =
           await textRecognizer.processImage(inputImage);
-      print("words : ${recognizedText}");
       recognizedWords = [];
-      print("words : ${recognizedWords}");
       ignoredFields = [];
+      scannedFields = [];
       ignoredFieldsAssignments = {};
       _clearAllControllers();
+
       for (TextBlock block in recognizedText.blocks) {
         for (TextLine line in block.lines) {
           recognizedWords.add(line.text);
-          print("${recognizedWords.reversed}");
         }
       }
 
@@ -116,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final addressPattern =
         RegExp(r'[\d\w\s,.]+'); // Generic pattern for address
 
-    // Initialize fields
     String name = "";
     String designation = "";
     String companyName = "";
@@ -129,37 +162,29 @@ class _HomeScreenState extends State<HomeScreen> {
     String city = "";
     String pincode = "";
 
-    // Extract and categorize the recognized text
+    ignoredFields.clear();
+    scannedFields.clear();
+
+    ignoredFieldsAssignments.clear();
+
     for (var line in recognizedWords) {
-      // Check for phone numbers
       if (phonePattern.hasMatch(line) && mobileNumber.isEmpty) {
         mobileNumber = line;
       } else if (phonePattern.hasMatch(line) &&
           mobileNumber.isNotEmpty &&
           altMobileNumber.isEmpty) {
         altMobileNumber = line;
-      }
-
-      // Check for email
-      if (emailPattern.hasMatch(line) && email.isEmpty) {
+      } else if (emailPattern.hasMatch(line) && email.isEmpty) {
         email = line;
-      }
-
-      // Check for pincode
-      if (pincodePattern.hasMatch(line) && pincode.isEmpty) {
+      } else if (pincodePattern.hasMatch(line) && pincode.isEmpty) {
         pincode = line;
-      }
-
-      // Check for designation and company name
-      if (line.contains('Manager Business Development') &&
-          designation.isEmpty) {
-        designation = '';
-      } else if (line.contains('Buson Digital Services India Pvt. Ltd.') &&
-          companyName.isEmpty) {
-        companyName = '';
+      } else if (line.contains('Designation Keyword') && designation.isEmpty) {
+        designation = line;
+      } else if (line.contains('Company Keyword') && companyName.isEmpty) {
+        companyName = line;
       } else if (name.isEmpty &&
-          !line.contains('Manager Business Development') &&
-          !line.contains('Buson Digital Services India Pvt. Ltd.')) {
+          !line.contains('Designation Keyword') &&
+          !line.contains('Company Keyword')) {
         name = line;
       } else if (addressPattern.hasMatch(line) && address1.isEmpty) {
         address1 = line;
@@ -175,9 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    // Populate the fields with recognized values
     nameController.text = name;
-    designationnameController.text = designation;
+    designationController.text = designation;
     companyController.text = companyName;
     mobileController.text = mobileNumber;
     altMobileController.text = altMobileNumber;
@@ -189,9 +213,17 @@ class _HomeScreenState extends State<HomeScreen> {
     pincodeController.text = pincode;
   }
 
+  void _onDropdownSelected(String selectedField) {
+    setState(() {
+      if (ignoredFieldValue != null) {
+        fieldControllers[selectedField]?.text = ignoredFieldValue!;
+      }
+    });
+  }
+
   void _clearAllControllers() {
     nameController.clear();
-    designationnameController.clear();
+    designationController.clear();
     companyController.clear();
     mobileController.clear();
     altMobileController.clear();
@@ -236,10 +268,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  fetchingdata() {}
+  List<TextEditingController> mycontroller =
+      List.generate(50, (index) => TextEditingController());
   Widget _buildLabeledDropdownField(
-      String label, TextEditingController controller, List<String> options) {
+      String label, TextEditingController controller) {
+    final Map<String, TextEditingController> controllersMap = {
+      'Name': nameController,
+      'Designation': designationController,
+      'Company Name': companyController,
+      'Mobile': mobileController,
+      'Alternate Mobile': altMobileController,
+      'Email ID': emailController,
+      'Address 1': address1Controller,
+      'Address 2': address2Controller,
+      'Area': areaController,
+      'City': cityController,
+      'State': stateController,
+      'Pincode': pincodeController,
+    };
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -251,72 +301,101 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              // Editable Text Field
-              Expanded(
-                flex: 4,
+              // The TextFormField to display the selected value
+              Container(
+                // color: Colors.blue,
+                width: 250,
                 child: TextFormField(
                   cursorColor: Colors.blue,
-                  controller: controller,
+                  controller:
+                      controller, // This will reflect the selected value
+                  readOnly: true,
                   decoration: InputDecoration(
-                    hintText: 'Enter or select $label',
+                    hintText: 'Select $label',
                     border: const UnderlineInputBorder(
                       borderSide: BorderSide(
-                        color:
-                            Colors.blue, // Set the color for the focused border
+                        color: Colors.blue,
                         width: 2.0,
                       ),
                     ),
-                    focusedBorder: UnderlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
-                        color:
-                            Colors.blue, // Set the color for the focused border
+                        color: Colors.blue,
                         width: 2.0,
                       ),
                     ),
-                    enabledBorder: UnderlineInputBorder(
+                    enabledBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Colors.grey, // Default border color
+                        color: Colors.grey,
                         width: 1.0,
                       ),
                     ),
                   ),
-                  onChanged: (text) {
-                    // Update the text field state when the user types
-                    setState(() {
-                      if (options.contains(text)) {
-                        controller.text = text;
-                      }
-                    });
-                  },
                 ),
               ),
               const SizedBox(width: 10),
-              // Dropdown Button for selecting values
-              Expanded(
-                flex: 2,
-                child: DropdownButton<String>(
-                  value: options.contains(controller.text)
-                      ? controller.text
-                      : null,
-                  isExpanded: true,
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        controller.text = newValue;
-                      });
-                    }
-                  },
-                  items: options.map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(
-                        value,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    );
-                  }).toList(),
-                ),
+              // The dropdown button
+
+              Assignedvalue(
+                availableFields: availableFields,
+                selectedField222: label,
+                controllersMap: controllersMap,
+                onFieldSelected: (selectedField, assignedValue) {
+                  // Do something when a field is selected
+                },
               ),
+
+              // IgnoredFieldsHandler(
+              //             ignoredFields: ignoredFields,
+              //             assignments: ignoredFieldsAssignments,
+              //             onUpdate: (assignments) {
+              //               setState(() {
+              //                 ignoredFieldsAssignments = assignments;
+              //                 _updateTextFieldsFromAssignments();
+              //               });
+              //             },
+              //           ),
+              // Expanded(
+              //   flex: 2,
+              //   child: PopupMenuButton<String>(
+              //     onSelected: (String selectedField) {
+              //       setState(() {
+              //         // Update the controller's value to reflect the selected item
+              //         controller.text = selectedField;
+              //         // Also update ignoredFieldValue if needed for other state management
+              //         // ignoredFieldValue = selectedField;
+              //         // _onDropdownSelected(
+              //         //     selectedField); // Any additional logic
+              //       });
+              //     },
+              //     itemBuilder: (BuildContext context) {
+              //       // Building the list of options in the dropdown
+              //       return fieldControllers.entries.map<PopupMenuItem<String>>(
+              //           (MapEntry<String, TextEditingController> entry) {
+              //         return PopupMenuItem<String>(
+              //           value: entry.key, // field name as the value
+              //           child: Text(
+              //             entry.key, // Display field name in the dropdown
+              //             style: const TextStyle(fontSize: 14),
+              //           ),
+              //         );
+              //       }).toList();
+              //     },
+              //     child: Row(
+              //       children: [
+              //         Text(
+              //           // Display the selected value or the default hint
+              //           // controller.text.isNotEmpty
+              //           //     ? controller.text
+              //           //     :
+              //           "Select Field",
+              //           style: const TextStyle(fontSize: 14),
+              //         ),
+              //         const Icon(Icons.arrow_drop_down),
+              //       ],
+              //     ),
+              //   ),
+              // ),
             ],
           ),
         ],
@@ -324,18 +403,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  _saveForm() {}
+  _saveForm() {
+    // Implement the save functionality here
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bussiness Card OCR'),
+        title: const Text('Business Card OCR'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: () {
-              // Implement the save functionality here
               _saveForm();
             },
           ),
@@ -378,31 +458,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildLabeledDropdownField('Name', nameController),
                     _buildLabeledDropdownField(
-                        'Name', nameController, recognizedWords),
+                        'Designation', designationController),
                     _buildLabeledDropdownField(
-                      'Designation',
-                      designationnameController,
-                      recognizedWords,
-                    ),
+                        'Company Name', companyController),
+                    _buildLabeledDropdownField('Mobile', mobileController),
                     _buildLabeledDropdownField(
-                        'Company Name', companyController, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'Mobile', mobileController, recognizedWords),
-                    _buildLabeledDropdownField('Alternate Mobile',
-                        altMobileController, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'Email ID', emailController, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'Address 1', address1Controller, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'Address 2', address2Controller, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'Area', areaController, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'City', cityController, recognizedWords),
-                    _buildLabeledDropdownField(
-                        'Pincode', pincodeController, recognizedWords),
+                        'Alternate Mobile', altMobileController),
+                    _buildLabeledDropdownField('Email ID', emailController),
+                    _buildLabeledDropdownField('Address 1', address1Controller),
+                    _buildLabeledDropdownField('Address 2', address2Controller),
+                    _buildLabeledDropdownField('Area', areaController),
+                    _buildLabeledDropdownField('City', cityController),
+                    _buildLabeledDropdownField('Pincode', pincodeController),
                     const SizedBox(height: 16),
                     if (ignoredFields.isNotEmpty)
                       Column(
@@ -440,9 +509,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  updatevaluefromscanned() {}
+
+  void updateTextFieldFromScannedValues() {
+    // Map field names to their corresponding controllers
+    final assignMap = {
+      'Name': nameController,
+      'Designation': designationController, // Added this missing field
+      'Company Name': companyController,
+      'Mobile': mobileController,
+      'Alternate Mobile': altMobileController,
+      'Email ID': emailController,
+      'Address 1': address1Controller,
+      'Address 2': address2Controller,
+      'Area': areaController,
+      'City': cityController,
+      'State': stateController,
+      'Pincode': pincodeController,
+    };
+
+    for (var incomingvalue in scannedvalues.entries) {
+      final buildfield = incomingvalue.key;
+      final assignedvalues = incomingvalue.value;
+      final buildcontroller = assignMap[buildfield];
+      if (buildcontroller != null) {
+        buildcontroller.text = assignedvalues;
+      }
+    }
+  }
+
   void _updateTextFieldsFromAssignments() {
     final assignmentMap = {
       'Name': nameController,
+      'Designation': designationController,
       'Company Name': companyController,
       'Mobile': mobileController,
       'Alternate Mobile': altMobileController,
@@ -458,7 +557,6 @@ class _HomeScreenState extends State<HomeScreen> {
     for (var entry in ignoredFieldsAssignments.entries) {
       final field = entry.key;
       final assignedField = entry.value;
-
       final controller = assignmentMap[assignedField];
       if (controller != null) {
         controller.text = field;
@@ -492,6 +590,210 @@ class ImagePreview extends StatelessWidget {
   }
 }
 
+class Assignedvalue extends StatefulWidget {
+  final List<String> availableFields;
+  String? selectedField222;
+  //  log('Field: $selectedField, Assigned Value: $assignedValue');
+  // List of dropdown fields
+  final Map<String, TextEditingController>
+      controllersMap; // Map of field names to controllers
+  final Function(String selectedField, String assignedValue) onFieldSelected;
+
+  Assignedvalue({
+    Key? key,
+    required this.availableFields,
+    required this.selectedField222,
+    required this.controllersMap,
+    required this.onFieldSelected,
+  }) : super(key: key);
+
+  @override
+  _AssignedvalueState createState() => _AssignedvalueState();
+}
+
+class _AssignedvalueState extends State<Assignedvalue> {
+  String? selectedField;
+
+  @override
+  Widget build(BuildContext context) {
+    //  PopupMenuItem<String>(
+    //                   value: field,
+    //                   child: Text(field),
+    //                 );
+    //               }).toList();
+    //             },
+    //             child: Row(
+    //               children: [
+    //                 Text(currentAssignment),
+    //                 const Icon(Icons.arrow_drop_down),
+
+    return Row(
+      children: [
+        Container(
+          // color: Colors.green,
+          // width: 100,
+          // height: 10,
+          child: DropdownButton<String>(
+            hint: const Text('Select'),
+            value: selectedField,
+            items: widget.availableFields.map((field) {
+              return DropdownMenuItem<String>(
+                value: field,
+                child: Text(
+                  field,
+                  style: TextStyle(fontSize: 10, color: Colors.black),
+                ),
+              );
+            }).toList(),
+            onChanged: (newField) {
+              setState(() {
+                selectedField = newField;
+                // log("message" + controllercontroller.toString());
+                // Assign value to the corresponding controller
+                if (newField != null &&
+                    widget.controllersMap[newField] != null) {
+                  final controller = widget.controllersMap[newField]!;
+                  log(controller.text.toString());
+                  controller.text =
+                      widget.controllersMap[widget.selectedField222!]!.text;
+                  // Update the controller's text with the selected field name or any value you need
+                  // controller.text =
+                  //     'Assigned Value'; // Replace with desired value if needed
+
+                  // Notify the parent widget if necessary
+                  widget.onFieldSelected(newField, controller.text);
+                }
+              });
+            },
+          ),
+        ),
+        // const Icon(Icons.arrow_drop_down),
+      ],
+    );
+  }
+}
+
+class ScannedFieldHandler extends StatefulWidget {
+  final List<String> scannedvalues;
+  final Map<String, String> valueassignments;
+  final Function(Map<String, String>) onUptodate;
+
+  ScannedFieldHandler({
+    Key? key,
+    required this.onUptodate,
+    required this.scannedvalues,
+    required this.valueassignments,
+  });
+
+  @override
+  _ScannedFieldHandlerState createState() => _ScannedFieldHandlerState();
+}
+
+class _ScannedFieldHandlerState extends State<ScannedFieldHandler> {
+  final List<String> buildavailableFields = [
+    'Name',
+    'Designation',
+    'Company Name',
+    'Mobile',
+    'Alternate Mobile',
+    'Email ID',
+    'Address 1',
+    'Address 2',
+    'Area',
+    'City',
+    'State',
+    'Pincode'
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ...widget.scannedvalues.map((field) {
+        // return
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            setState(() {
+              // widget.valueassignments[field] = value;
+              widget.onUptodate(widget.valueassignments);
+            });
+          },
+          itemBuilder: (context) {
+            return buildavailableFields.map((availableField) {
+              return PopupMenuItem<String>(
+                value: availableField,
+                child: Text(availableField),
+              );
+            }).toList();
+          },
+          child: Container(
+            color: Colors.yellow,
+            child: Row(
+              children: [
+                Text("Select field"),
+                const Icon(Icons.arrow_drop_down),
+              ],
+            ),
+          ),
+        ),
+        // }).toList(),
+
+        // const Text(
+        //   "Select field",
+        //   style: TextStyle(fontWeight: FontWeight.bold),
+        // ),
+        // const SizedBox(height: 16),
+
+        // Correctly map over scanned values here
+        // ...widget.scannedvalues.map((field) {
+        //   final currentAssignments =
+        //       widget.valueassignments[field] ?? 'Select Field';
+
+        //   return Padding(
+        //     padding: const EdgeInsets.symmetric(
+        //         vertical: 8.0), // Add spacing between fields
+        //     child: Row(
+        //       children: [
+        //         // TextField(
+        //         //   readOnly: true,
+        //         //   controller: TextEditingController(text: field),
+        //         //   decoration: InputDecoration(
+        //         //     border: OutlineInputBorder(),
+        //         //   ),
+        //         // ),
+        //         const SizedBox(width: 16),
+        //         PopupMenuButton<String>(
+        //           onSelected: (value) {
+        //             setState(() {
+        //               widget.valueassignments[field] = value;
+        //               widget.onUptodate(widget.valueassignments);
+        //             });
+        //           },
+        //           itemBuilder: (context) {
+        //             return buildavailableFields.map((availableField) {
+        //               return PopupMenuItem<String>(
+        //                 value: availableField,
+        //                 child: Text(availableField),
+        //               );
+        //             }).toList();
+        //           },
+        //           child: Row(
+        //             children: [
+        //               Text(currentAssignments),
+        //               const Icon(Icons.arrow_drop_down),
+        //             ],
+        //           ),
+        //         ),
+        //       ],
+        //     ),
+        //   );
+        // }).toList(),
+      ],
+    );
+  }
+}
+
 class IgnoredFieldsHandler extends StatefulWidget {
   final List<String> ignoredFields;
   final Map<String, String> assignments;
@@ -511,6 +813,7 @@ class IgnoredFieldsHandler extends StatefulWidget {
 class _IgnoredFieldsHandlerState extends State<IgnoredFieldsHandler> {
   final List<String> availableFields = [
     'Name',
+    'Designation',
     'Company Name',
     'Mobile',
     'Alternate Mobile',
@@ -534,13 +837,12 @@ class _IgnoredFieldsHandlerState extends State<IgnoredFieldsHandler> {
         ),
         const SizedBox(height: 16),
         ...widget.ignoredFields.map((field) {
-          final currentAssignment = widget.assignments[field] ?? 'Select Field';
-
+          final currentAssignment = 'Select Field';
           return Row(
             children: [
               Expanded(
                 child: TextField(
-                  readOnly: false,
+                  readOnly: true,
                   controller: TextEditingController(text: field),
                   decoration: InputDecoration(
                     border: OutlineInputBorder(),
